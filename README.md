@@ -13,11 +13,6 @@ A React-based Adobe Creative Cloud Add-on sample project built using `@adobe/cre
   - [Installation](#installation)
   - [Development](#development)
   - [Build Instructions](#build-instructions)
-- [Project Structure](#project-structure)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-
 ---
 
 ## 🚀 Features
