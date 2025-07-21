@@ -1,0 +1,9 @@
+/*@import "tailwindcss";*/
+@tailwind utilities;
+@plugin "daisyui";
+
+.container {
+    margin: 0px;
+    display: flex;
+    flex-direction: column;
+}

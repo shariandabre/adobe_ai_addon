@@ -1,0 +1,31 @@
+{
+    "testId": "136d6bcd-7365-4280-b08c-f48148433369",
+    "name": "Buildr",
+    "version": "1.0.0",
+    "manifestVersion": 2,
+    "requirements": {
+        "apps": [
+            {
+                "name": "Express",
+                "apiVersion": 1
+            }
+        ],
+
+        "renditionPreview": true
+    },
+    "entryPoints": [
+        {
+            "type": "panel",
+            "id": "panel1",
+            "main": "index.html",
+            "documentSandbox": "code.js",
+            "permissions": {
+                "sandbox": [
+                    "allow-popups",
+                    "allow-downloads"
+                ],
+                "microphone": "*"
+            }
+        }
+    ]
+}
