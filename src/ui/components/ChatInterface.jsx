@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { TbMicrophone } from "react-icons/tb";
 import { FaArrowUp } from "react-icons/fa";
+import { HiSparkles } from "react-icons/hi2";
 
 import UserChatBubble from "./UserChatBubble";
 import AgentChatBubble from "./AgentChatBubble";
@@ -688,6 +689,7 @@ export default function ChatInterface({ sandboxProxy }) {
             setVoiceActive(false);
         }
     }
+
     async function openLiveSession(stream) {
         let sessionClosed = false;
         let reader;
@@ -714,7 +716,6 @@ export default function ChatInterface({ sandboxProxy }) {
             const track = stream.getAudioTracks()[0];
             reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
 
-            // Add WebSocket state validation
             const isSessionAlive = () =>
                 !sessionClosed &&
                 session.readyState === WebSocket.OPEN;
@@ -727,14 +728,12 @@ export default function ChatInterface({ sandboxProxy }) {
 
                         const pcm16k = to16kPCM(audioData);
 
-                        // Double-check before sending
                         if (isSessionAlive()) {
                             await session.sendRealtimeInput({
                                 audio: { data: pcm16k, mimeType: "audio/pcm;rate=16000" },
                             });
                         }
                     } catch (err) {
-                        // Break loop if session is dead
                         if (!isSessionAlive()) break;
                         console.error("Error sending audio chunk:", err);
                     } finally {
@@ -742,7 +741,6 @@ export default function ChatInterface({ sandboxProxy }) {
                     }
                 }
 
-                // Cleanup after loop exits
                 reader.releaseLock();
                 stream.getTracks().forEach(t => t.stop());
             })();
@@ -753,7 +751,7 @@ export default function ChatInterface({ sandboxProxy }) {
                     await reader?.cancel();
                     reader?.releaseLock();
                     await session.close();
-                } catch { }  // Ignore errors during cleanup
+                } catch { }
                 stream.getTracks().forEach(t => t.stop());
             };
 
@@ -763,18 +761,16 @@ export default function ChatInterface({ sandboxProxy }) {
             stream.getTracks().forEach(t => t.stop());
         }
     }
+
     async function handleLiveResponse(msg) {
-        /* 1. Audio – play every data chunk the model streams back */
         if (msg.data) {
             const wavBlob = new Blob([msg.data], { type: "audio/wav" });
             new Audio(URL.createObjectURL(wavBlob)).play().catch(() => { });
         }
 
-        /* 2. Thoughts payload (JSON in text) */
         if (msg.text?.trim().startsWith("{") && msg.text.includes('"thoughts"')) {
             try {
                 const payload = JSON.parse(msg.text);
-
                 for (const thought of payload.thoughts ?? []) {
                     await speak(thought);
                 }
@@ -784,7 +780,6 @@ export default function ChatInterface({ sandboxProxy }) {
             }
         }
 
-        /* 3. Tool calls (function calls) */
         for (const call of msg.toolCalls ?? []) {
             const fn = sandboxProxy?.[call.name];
             if (typeof fn === "function") {
@@ -794,10 +789,6 @@ export default function ChatInterface({ sandboxProxy }) {
             }
         }
     }
-
-    useEffect(() => {
-        endRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, streaming, streamingThought]);
 
     async function fetchCanvasState() {
         try {
@@ -820,7 +811,7 @@ export default function ChatInterface({ sandboxProxy }) {
 
     async function buildPrompt(userText) {
         const state = JSON.stringify(await fetchCanvasState()).slice(0, 8000);
-        return `You are **Buildr**, an expert AI agent for creating professional designs in Adobe Express. Your primary goal is to translate user requests into high-quality, ready-to-use marketing materials by calling the appropriate functions.
+        return `You are **Imagine**, an expert AI agent for creating professional designs in Adobe Express. Your primary goal is to translate user requests into high-quality, ready-to-use marketing materials by calling the appropriate functions.
 
 ## Your Capabilities
 You can now create complete marketing materials including:
@@ -861,7 +852,8 @@ ${userText}`;
 
         let thoughts = [];
         let summary = "Done!";
-        const litePrompt = `You are Buildr planning your actions. Respond ONLY with valid JSON: {\n  "thoughts": ["step1","step2",...],\n  "summary": "Past-tense summary"\n}`;
+        const litePrompt = `You are Imagine planning your actions. Respond ONLY with valid JSON: {\n  "thoughts": ["step1","step2",...],\n  "summary": "Past-tense summary"\n}`;
+        
         try {
             const resp1 = await ai.models.generateContent({
                 model: "gemini-2.0-flash-lite",
@@ -930,14 +922,105 @@ ${userText}`;
 
     const onKeyDown = e => {
         if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault(); sendPrompt();
+            e.preventDefault(); 
+            sendPrompt();
         }
     };
 
+    // Mock components for demonstration - replace with your actual components
+    const UserChatBubble = ({ message }) => (
+        <div className="flex justify-end mb-4">
+            <div className="bg-blue-600 text-white rounded-2xl rounded-tr-md px-4 py-2 max-w-xs shadow-sm">
+                {message}
+            </div>
+        </div>
+    );
+
+    const AgentChatBubble = ({ message }) => (
+        <div className="flex justify-start mb-4">
+            <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-md px-4 py-2 max-w-xs shadow-sm">
+                {message}
+            </div>
+        </div>
+    );
+
+    const Thought = ({ isThinking, thinkingMessage }) => (
+        <div className="flex justify-start mb-4">
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-2xl rounded-tl-md px-4 py-3 max-w-xs">
+                <div className="flex items-center space-x-2 mb-1">
+                    <HiSparkles className="w-4 h-4 text-purple-500" />
+                    <span className="text-xs font-medium text-purple-700">
+                        {isThinking ? "Thinking..." : "Thought"}
+                    </span>
+                </div>
+                <div className="text-sm text-gray-700">
+                    {thinkingMessage}
+                    {isThinking && (
+                        <span className="inline-block w-2 h-4 bg-purple-500 ml-1 animate-pulse"></span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
     return (
-        <div className="w-full bg-gray-50">
-            {/* Chat log */}
-            <div className="flex flex-col overflow-y-auto px-4 pt-2 space-y-1" style={{ height: "calc(100vh - 100px)" }}>
+        <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+            {/* Header */}
+            <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm border-b border-gray-200/60 px-6 py-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                            <HiSparkles className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg font-semibold text-gray-900">Imagine AI</h1>
+                            <p className="text-xs text-gray-500">Professional Design Assistant</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        {voiceActive && (
+                            <div className="flex items-center space-x-1 bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                <span>Recording</span>
+                            </div>
+                        )}
+                        {streaming && (
+                            <div className="flex items-center space-x-1 bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                <span>Processing</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                {messages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+                        <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                            <HiSparkles className="w-8 h-8 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-800 mb-2">Welcome to Imagine AI</h2>
+                            <p className="text-gray-600 mb-6 max-w-md">
+                                Create professional designs with AI. From posters to business cards, 
+                                I'll help you build stunning marketing materials.
+                            </p>
+                            <div className="grid grid-cols-2 gap-3 max-w-md">
+                                <div className="bg-white border border-gray-200 rounded-lg p-3 text-left">
+                                    <div className="font-medium text-sm text-gray-800">Design Types</div>
+                                    <div className="text-xs text-gray-500">Posters, Flyers, Cards</div>
+                                </div>
+                                <div className="bg-white border border-gray-200 rounded-lg p-3 text-left">
+                                    <div className="font-medium text-sm text-gray-800">Smart AI</div>
+                                    <div className="text-xs text-gray-500">Professional Results</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
                 {messages.map((msg, i) => {
                     if (msg.role === "user") return <UserChatBubble key={i} message={msg.text} />;
                     if (msg.role === "assistant") return <AgentChatBubble key={i} message={msg.text} />;
@@ -951,41 +1034,87 @@ ${userText}`;
                         />
                     );
                 })}
+                
                 {streaming && <Thought isThinking={true} thinkingTime={0} thinkingMessage={streamingThought} />}
                 <div ref={endRef} />
             </div>
 
-            {/* Input bar */}
-            <div className="flex px-2 h-[50px] sticky bottom-0 w-full">
-                <div className="z-10 w-full rounded-[15px] h-fit bg-white border-gray-200 border-[1px] p-3">
-                    <div className="w-full flex items-center space-x-2">
-                        <input
-                            type="text"
-                            className="flex-grow rounded-md text-sm focus:outline-none border-none"
-                            placeholder="Create Anything …"
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={onKeyDown}
-                            disabled={isSending || voiceActive}
-                        />
-                    </div>
-                    <div className="w-full flex justify-end mt-1">
-                        <div className="flex w-fit gap-2">
-                            <button onClick={sendPrompt} disabled={isSending || voiceActive || !input.trim()}>
-                                <div className="flex justify-center items-center w-[22px] h-[22px] bg-black rounded-[11px] hover:opacity-80 disabled:opacity-40">
-                                    {isSending ? (
-                                        <span className="loading loading-spinner loading-xs text-white" />
-                                    ) : (
-                                        <FaArrowUp className="text-white" style={{ width: 12, height: 12 }} />
-                                    )}
-                                </div>
+            {/* Input Area */}
+            <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm border-t border-gray-200/60 px-6 py-4">
+                <div className="relative">
+                    {/* Input Container */}
+                    <div className="bg-white border border-gray-300 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                        <div className="flex items-end space-x-3 p-4">
+                            {/* Voice Button */}
+                            <button
+                                onClick={toggleVoice}
+                                className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                                    voiceActive 
+                                        ? "bg-red-500 hover:bg-red-600 text-white shadow-lg" 
+                                        : "bg-gray-100 hover:bg-gray-200 text-gray-600"
+                                }`}
+                                disabled={isSending}
+                            >
+                                {voiceActive ? (
+                                    <TbMicrophoneOff className="w-5 h-5" />
+                                ) : (
+                                    <TbMicrophone className="w-5 h-5" />
+                                )}
+                            </button>
+
+                            {/* Text Input */}
+                            <div className="flex-1">
+                                <textarea
+                                    className="w-full resize-none bg-transparent border-none outline-none text-gray-800 placeholder-gray-500 text-sm leading-relaxed max-h-32"
+                                    placeholder="Describe the design you want to create..."
+                                    value={input}
+                                    onChange={e => setInput(e.target.value)}
+                                    onKeyDown={onKeyDown}
+                                    disabled={isSending || voiceActive}
+                                    rows={1}
+                                    style={{
+                                        minHeight: '20px',
+                                        height: 'auto',
+                                        maxHeight: '128px',
+                                    }}
+                                />
+                            </div>
+
+                            {/* Send Button */}
+                            <button
+                                onClick={sendPrompt}
+                                disabled={isSending || voiceActive || !input.trim()}
+                                className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                                    isSending || voiceActive || !input.trim()
+                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                                }`}
+                            >
+                                {isSending ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                    <FaArrowUp className="w-4 h-4" />
+                                )}
                             </button>
                         </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="flex items-center justify-center mt-3 space-x-4 text-xs text-gray-500">
+                        <span className="flex items-center space-x-1">
+                            <span>Press</span>
+                            <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Enter</kbd>
+                            <span>to send</span>
+                        </span>
+                        <span className="text-gray-300">•</span>
+                        <span className="flex items-center space-x-1">
+                            <span>Hold</span>
+                            <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Shift</kbd>
+                            <span>for new line</span>
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
     );
 }
-
-

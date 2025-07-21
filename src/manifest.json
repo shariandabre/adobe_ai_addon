@@ -1,6 +1,6 @@
 {
     "testId": "136d6bcd-7365-4280-b08c-f48148433369",
-    "name": "Buildr",
+    "name": "Design Assistant",
     "version": "1.0.0",
     "manifestVersion": 2,
     "requirements": {
@@ -10,7 +10,6 @@
                 "apiVersion": 1
             }
         ],
-
         "renditionPreview": true
     },
     "entryPoints": [
